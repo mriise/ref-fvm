@@ -336,6 +336,10 @@ where
         self.0.create_actor(code_id, actor_id)
     }
 
+    fn install_actor(&self, code_id: Cid) -> Result<()> {
+        Ok(())
+    }
+
     fn resolve_builtin_actor_type(&self, code_cid: &Cid) -> Option<actor::builtin::Type> {
         self.0.resolve_builtin_actor_type(code_cid)
     }
