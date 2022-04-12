@@ -908,6 +908,17 @@ where
         )
     }
 
+    fn install_actor(&mut self, code_id: Cid) -> Result<()> {
+        // TODO figure out gas
+        self.call_manager
+            .machine()
+            .engine()
+            .preload(self.call_manager.blockstore(), &[code_id])
+            .map_err(|_| {
+                syscall_error!(IllegalArgument; "failed to load actor code").into()
+            })
+    }
+
     fn resolve_builtin_actor_type(&self, code_cid: &Cid) -> Option<actor::builtin::Type> {
         self.call_manager
             .machine()

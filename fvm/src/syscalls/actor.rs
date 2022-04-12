@@ -82,6 +82,14 @@ pub fn create_actor(
     context.kernel.create_actor(typ, actor_id)
 }
 
+pub fn install_actor(
+    context: Context<'_, impl Kernel>,
+    typ_off: u32,  // Cid
+) -> Result<()> {
+    let typ = context.memory.read_cid(typ_off)?;
+    context.kernel.install_actor(typ)
+}
+
 pub fn resolve_builtin_actor_type(
     context: Context<'_, impl Kernel>,
     code_cid_off: u32, // Cid
