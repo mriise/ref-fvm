@@ -16,6 +16,7 @@ use num_traits::{Signed, Zero};
 use super::{Engine, Machine, MachineContext};
 use crate::blockstore::BufferedBlockstore;
 use crate::externs::Externs;
+use crate::init_actor::State as InitActorState;
 use crate::kernel::{ClassifyResult, Context as _, Result};
 use crate::state_tree::{ActorState, StateTree};
 use crate::syscall_error;
@@ -114,6 +115,14 @@ where
         // ahead of time, but with user-supplied code, we won't have that
         // guarantee.
         engine.preload(state_tree.store(), builtin_actors.left_values())?;
+
+        // preload user actors that have been installed
+        let (init_state, _) = InitActorState::load(&state_tree)?;
+        let installed_actors: Vec<Cid> = state_tree
+            .store()
+            .get_cbor(&init_state.installed_actors)?
+            .context("failed to load installed actor list")?;
+        engine.preload(state_tree.store(), &installed_actors)?;
 
         Ok(DefaultMachine {
             context: context.clone(),
