@@ -55,83 +55,83 @@ lazy_static::lazy_static! {
     };
 }
 
-#[cfg(test)]
-mod test {
-    use fvm_ipld_blockstore::MemoryBlockstore;
-    use fvm_ipld_encoding::CborStore;
-    use fvm_shared::actor::builtin::Manifest;
-    use fvm_shared::state::StateTreeVersion;
-    use multihash::Code;
+// #[cfg(test)]
+// mod test {
+//     use fvm_ipld_blockstore::MemoryBlockstore;
+//     use fvm_ipld_encoding::CborStore;
+//     use fvm_shared::actor::builtin::Manifest;
+//     use fvm_shared::state::StateTreeVersion;
+//     use multihash::Code;
 
-    use crate::call_manager::DefaultCallManager;
-    use crate::externs::{Consensus, Externs, Rand};
-    use crate::machine::{DefaultMachine, Engine, NetworkConfig};
-    use crate::state_tree::StateTree;
-    use crate::{executor, DefaultKernel};
+//     use crate::call_manager::DefaultCallManager;
+//     use crate::externs::{Consensus, Externs, Rand};
+//     use crate::machine::{DefaultMachine, Engine, NetworkConfig};
+//     use crate::state_tree::StateTree;
+//     use crate::{executor, DefaultKernel};
 
-    struct DummyExterns;
+//     struct DummyExterns;
 
-    impl Externs for DummyExterns {}
+//     impl Externs for DummyExterns {}
 
-    impl Rand for DummyExterns {
-        fn get_chain_randomness(
-            &self,
-            _pers: fvm_shared::crypto::randomness::DomainSeparationTag,
-            _round: fvm_shared::clock::ChainEpoch,
-            _entropy: &[u8],
-        ) -> anyhow::Result<[u8; 32]> {
-            todo!()
-        }
+//     impl Rand for DummyExterns {
+//         fn get_chain_randomness(
+//             &self,
+//             _pers: fvm_shared::crypto::randomness::DomainSeparationTag,
+//             _round: fvm_shared::clock::ChainEpoch,
+//             _entropy: &[u8],
+//         ) -> anyhow::Result<[u8; 32]> {
+//             todo!()
+//         }
 
-        fn get_beacon_randomness(
-            &self,
-            _pers: fvm_shared::crypto::randomness::DomainSeparationTag,
-            _round: fvm_shared::clock::ChainEpoch,
-            _entropy: &[u8],
-        ) -> anyhow::Result<[u8; 32]> {
-            todo!()
-        }
-    }
+//         fn get_beacon_randomness(
+//             &self,
+//             _pers: fvm_shared::crypto::randomness::DomainSeparationTag,
+//             _round: fvm_shared::clock::ChainEpoch,
+//             _entropy: &[u8],
+//         ) -> anyhow::Result<[u8; 32]> {
+//             todo!()
+//         }
+//     }
 
-    impl Consensus for DummyExterns {
-        fn verify_consensus_fault(
-            &self,
-            _h1: &[u8],
-            _h2: &[u8],
-            _extra: &[u8],
-        ) -> anyhow::Result<(Option<fvm_shared::consensus::ConsensusFault>, i64)> {
-            todo!()
-        }
-    }
+//     impl Consensus for DummyExterns {
+//         fn verify_consensus_fault(
+//             &self,
+//             _h1: &[u8],
+//             _h2: &[u8],
+//             _extra: &[u8],
+//         ) -> anyhow::Result<(Option<fvm_shared::consensus::ConsensusFault>, i64)> {
+//             todo!()
+//         }
+//     }
 
-    #[test]
-    fn test_constructor() {
-        let mut bs = MemoryBlockstore::default();
-        let mut st = StateTree::new(bs, StateTreeVersion::V4).unwrap();
-        let root = st.flush().unwrap();
-        bs = st.into_store();
+//     #[test]
+//     fn test_constructor() {
+//         let mut bs = MemoryBlockstore::default();
+//         let mut st = StateTree::new(bs, StateTreeVersion::V4).unwrap();
+//         let root = st.flush().unwrap();
+//         bs = st.into_store();
 
-        // An empty built-in actors manifest.
-        let manifest_cid = {
-            let manifest = Manifest::new();
-            bs.put_cbor(&manifest, Code::Blake2b256).unwrap()
-        };
+//         // An empty built-in actors manifest.
+//         let manifest_cid = {
+//             let manifest = Manifest::new();
+//             bs.put_cbor(&manifest, Code::Blake2b256).unwrap()
+//         };
 
-        let actors_cid = bs.put_cbor(&(0, manifest_cid), Code::Blake2b256).unwrap();
+//         let actors_cid = bs.put_cbor(&(0, manifest_cid), Code::Blake2b256).unwrap();
 
-        let mc = NetworkConfig::new(fvm_shared::version::NetworkVersion::V14)
-            .override_actors(actors_cid)
-            .for_epoch(0, root);
+//         let mc = NetworkConfig::new(fvm_shared::version::NetworkVersion::V14)
+//             .override_actors(actors_cid)
+//             .for_epoch(0, root);
 
-        let machine = DefaultMachine::new(
-            &Engine::new_default((&mc.network).into()).unwrap(),
-            &mc,
-            bs,
-            DummyExterns,
-        )
-        .unwrap();
-        let _ = executor::DefaultExecutor::<DefaultKernel<DefaultCallManager<_>>>::new(Box::new(
-            machine,
-        ));
-    }
-}
+//         let machine = DefaultMachine::new(
+//             &Engine::new_default((&mc.network).into()).unwrap(),
+//             &mc,
+//             bs,
+//             DummyExterns,
+//         )
+//         .unwrap();
+//         let _ = executor::DefaultExecutor::<DefaultKernel<DefaultCallManager<_>>>::new(Box::new(
+//             machine,
+//         ));
+//     }
+// }
