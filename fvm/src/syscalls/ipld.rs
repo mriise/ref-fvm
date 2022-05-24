@@ -21,7 +21,7 @@ pub fn block_create(
     data_len: u32,
 ) -> Result<u32> {
     let data = context.memory.try_slice(data_off, data_len)?;
-    context.kernel.block_create(codec, data)
+    context.kernel.block_create(codec, &data)
 }
 
 pub fn block_link(
