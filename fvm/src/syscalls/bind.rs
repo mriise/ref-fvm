@@ -14,7 +14,7 @@ use crate::kernel::{self, ExecutionError, Kernel, SyscallError};
 ///
 /// 1. If the error is a syscall error, it's returned as the first return value.
 /// 2. If the error is a fatal error, a Trap is returned.
-pub(super) trait BindSyscall<Args, Ret, Func> {
+pub(super) trait BindSyscall<Args, Ret, Func, Kernel> {
     /// Bind a syscall to the linker.
     ///
     /// 1. The return type will be automatically adjusted to return `Result<u32, Trap>` where
@@ -44,6 +44,14 @@ pub(super) trait BindSyscall<Args, Ret, Func> {
         module: &'static str,
         name: &'static str,
         syscall: Func,
+    ) -> anyhow::Result<&mut Self>;
+
+    fn bind_checked<Check: Fn(&Kernel) -> Result<(), Abort> + Send + Sync + 'static>(
+        &mut self,
+        module: &'static str,
+        name: &'static str,
+        syscall: Func,
+        check_fn: Check,
     ) -> anyhow::Result<&mut Self>;
 }
 
@@ -105,7 +113,7 @@ macro_rules! charge_syscall_gas {
 macro_rules! impl_bind_syscalls {
     ($($t:ident)*) => {
         #[allow(non_snake_case)]
-        impl<$($t,)* Ret, K, Func> BindSyscall<($($t,)*), Ret, Func> for Linker<InvocationData<K>>
+        impl<$($t,)* Ret, K, Func> BindSyscall<($($t,)*), Ret, Func, K> for Linker<InvocationData<K>>
         where
             K: Kernel,
             Func: Fn(Context<'_, K> $(, $t)*) -> Ret + Send + Sync + 'static,
@@ -158,7 +166,94 @@ macro_rules! impl_bind_syscalls {
 
                         // We need to check to make sure we can store the return value _before_ we do anything.
                         if (ret as u64) > (memory.len() as u64)
-                            || memory.len() - (ret as usize) < mem::size_of::<Ret::Value>() {
+                            || memory.len() - (ret as usize) <mem::size_of::<Ret::Value>() {
+                            let code = ErrorNumber::IllegalArgument;
+                            data.last_error = Some(backtrace::Cause::from_syscall(module, name, SyscallError(format!("no space for return value"), code)));
+                            return Ok(code as u32);
+                        }
+
+                        let ctx = Context{kernel: &mut data.kernel, memory: &mut memory};
+                        let result = match syscall(ctx $(, $t)*).into() {
+                            Ok(Ok(value)) => {
+                                log::trace!("syscall {}::{}: ok", module, name);
+                                unsafe { *(memory.as_mut_ptr().offset(ret as isize) as *mut Ret::Value) = value };
+                                data.last_error = None;
+                                Ok(0)
+                            },
+                            Ok(Err(err)) => {
+                                let code = err.1;
+                                log::trace!("syscall {}::{}: fail ({})", module, name, code as u32);
+                                data.last_error = Some(backtrace::Cause::from_syscall(module, name, err));
+                                Ok(code as u32)
+                            },
+                            Err(e) => Err(e.into()),
+                        };
+
+                        update_gas_available(&mut caller)?;
+
+                        result
+                    })
+                }
+            }
+
+            fn bind_checked<Check: Fn(&K) -> Result<(), Abort> + Send + Sync + 'static>(
+                &mut self,
+                module: &'static str,
+                name: &'static str,
+                syscall: Func,
+                check_fn: Check
+            ) -> anyhow::Result<&mut Self> {
+                if mem::size_of::<Ret::Value>() == 0 {
+                    // If we're returning a zero-sized "value", we return no value therefore and expect no out pointer.
+                    self.func_wrap(module, name, move |mut caller: Caller<'_, InvocationData<K>> $(, $t: $t)*| {
+                        charge_for_exec(&mut caller)?;
+
+                        let (mut memory, mut data) = memory_and_data(&mut caller);
+                        charge_syscall_gas!(data.kernel);
+                        // exit early if check errored
+                        if let Err(e) = check_fn(&data.kernel) {
+                            let trap: wasmtime::Trap = e.into();
+                            return Err(trap) 
+                        }
+
+                        let ctx = Context{kernel: &mut data.kernel, memory: &mut memory};
+
+                        let out = syscall(ctx $(, $t)*).into();
+
+                        let result = match out {
+                            Ok(Ok(_)) => {
+                                log::trace!("syscall {}::{}: ok", module, name);
+                                data.last_error = None;
+                                Ok(0)
+                            },
+                            Ok(Err(err)) => {
+                                let code = err.1;
+                                log::trace!("syscall {}::{}: fail ({})", module, name, code as u32);
+                                data.last_error = Some(backtrace::Cause::from_syscall(module, name, err));
+                                Ok(code as u32)
+                            },
+                            Err(e) => Err(e.into()),
+                        };
+
+                        update_gas_available(&mut caller)?;
+                        result
+                    })
+                } else {
+                    // If we're returning an actual value, we need to write it back into the wasm module's memory.
+                    self.func_wrap(module, name, move |mut caller: Caller<'_, InvocationData<K>>, ret: u32 $(, $t: $t)*| {
+                        charge_for_exec(&mut caller)?;
+
+                        let (mut memory, mut data) = memory_and_data(&mut caller);
+                        charge_syscall_gas!(data.kernel);
+                        // exit early if check errored
+                        if let Err(e) = check_fn(&data.kernel) {
+                            let trap: wasmtime::Trap = e.into();
+                            return Err(trap) 
+                        }
+
+                        // We need to check to make sure we can store the return value _before_ we do anything.
+                        if (ret as u64) > (memory.len() as u64)
+                            || memory.len() - (ret as usize) <mem::size_of::<Ret::Value>() {
                             let code = ErrorNumber::IllegalArgument;
                             data.last_error = Some(backtrace::Cause::from_syscall(module, name, SyscallError(format!("no space for return value"), code)));
                             return Ok(code as u32);

@@ -3,9 +3,10 @@ use std::mem;
 use anyhow::{anyhow, Context as _};
 use wasmtime::{AsContextMut, Global, Linker, Memory, Val};
 
-use crate::call_manager::backtrace;
+use crate::call_manager::{backtrace, CallManager};
 use crate::gas::Gas;
-use crate::Kernel;
+use crate::kernel::SelfOps;
+use crate::{Kernel, DefaultKernel};
 
 pub(crate) mod error;
 
@@ -92,6 +93,7 @@ pub fn charge_for_exec(
 use self::bind::BindSyscall;
 use self::error::Abort;
 
+
 // Binds the syscall handlers so they can handle invocations
 // from the actor code.
 pub fn bind_syscalls(
@@ -174,6 +176,103 @@ pub fn bind_syscalls(
     linker.bind("debug", "log", debug::log)?;
     linker.bind("debug", "enabled", debug::enabled)?;
     linker.bind("debug", "store_artifact", debug::store_artifact)?;
+
+    Ok(())
+}
+
+// Binds the syscall handlers that will do an abortive check before executing (for restricted enviornments like in the verify context)
+pub fn bind_checked_syscalls<C: CallManager>(linker: &mut Linker<InvocationData<crate::DefaultKernel<C>>>) -> anyhow::Result<()> {
+    // check that the original caller was itself, othewise abort
+    // "Restrictions on receiving" https://github.com/filecoin-project/FIPs/discussions/388
+    let check = |k: &DefaultKernel<C>| {
+        // TODO check
+        todo!()
+    };
+
+    linker.bind_checked("vm", "abort", vm::abort, check)?;
+    linker.bind_checked("vm", "context", vm::context, check)?;
+
+    linker.bind_checked("network", "base_fee", network::base_fee, check)?;
+    linker.bind_checked(
+        "network",
+        "total_fil_circ_supply",
+        network::total_fil_circ_supply,
+        check
+    )?;
+
+    linker.bind_checked("ipld", "block_open", ipld::block_open, check)?;
+    linker.bind_checked("ipld", "block_create", ipld::block_create, check)?;
+    linker.bind_checked("ipld", "block_read", ipld::block_read, check)?;
+    linker.bind_checked("ipld", "block_stat", ipld::block_stat, check)?;
+    linker.bind_checked("ipld", "block_link", ipld::block_link, check)?;
+
+    linker.bind_checked("self", "root", sself::root, check)?;
+    linker.bind_checked("self", "set_root", sself::set_root, check)?;
+    linker.bind_checked("self", "current_balance", sself::current_balance, check)?;
+    linker.bind_checked("self", "self_destruct", sself::self_destruct, check)?;
+
+    linker.bind_checked("actor", "resolve_address", actor::resolve_address, check)?;
+    linker.bind_checked("actor", "get_actor_code_cid", actor::get_actor_code_cid, check)?;
+    linker.bind_checked("actor", "new_actor_address", actor::new_actor_address, check)?;
+    linker.bind_checked("actor", "create_actor", actor::create_actor, check)?;
+    linker.bind_checked(
+        "actor",
+        "get_builtin_actor_type",
+        actor::get_builtin_actor_type,
+        check
+    )?;
+    linker.bind_checked(
+        "actor",
+        "get_code_cid_for_type",
+        actor::get_code_cid_for_type,
+        check
+    )?;
+
+    // Only wire this syscall when M2 native is enabled.
+    #[cfg(feature = "m2-native")]
+    linker.bind_checked("actor", "install_actor", actor::install_actor, check)?;
+
+    linker.bind_checked("crypto", "verify_signature", crypto::verify_signature, check)?;
+    linker.bind_checked("crypto", "hash", crypto::hash, check)?;
+    linker.bind_checked("crypto", "verify_seal", crypto::verify_seal, check)?;
+    linker.bind_checked("crypto", "verify_post", crypto::verify_post, check)?;
+    linker.bind_checked(
+        "crypto",
+        "compute_unsealed_sector_cid",
+        crypto::compute_unsealed_sector_cid,
+        check
+    )?;
+    linker.bind_checked(
+        "crypto",
+        "verify_consensus_fault",
+        crypto::verify_consensus_fault,
+        check
+    )?;
+    linker.bind_checked(
+        "crypto",
+        "verify_aggregate_seals",
+        crypto::verify_aggregate_seals,
+        check
+    )?;
+    linker.bind_checked(
+        "crypto",
+        "verify_replica_update",
+        crypto::verify_replica_update,
+        check
+    )?;
+    linker.bind_checked("crypto", "batch_verify_seals", crypto::batch_verify_seals, check)?;
+
+    linker.bind_checked("rand", "get_chain_randomness", rand::get_chain_randomness, check)?;
+    linker.bind_checked("rand", "get_beacon_randomness", rand::get_beacon_randomness, check)?;
+
+    linker.bind_checked("gas", "charge", gas::charge_gas, check)?;
+
+    // Ok, this singled-out syscall should probably be in another category.
+    linker.bind_checked("send", "send", send::send, check)?;
+
+    linker.bind_checked("debug", "log", debug::log, check)?;
+    linker.bind_checked("debug", "enabled", debug::enabled, check)?;
+    linker.bind_checked("debug", "store_artifact", debug::store_artifact, check)?;
 
     Ok(())
 }
