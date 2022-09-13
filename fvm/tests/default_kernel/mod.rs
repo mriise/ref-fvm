@@ -5,7 +5,7 @@ use fvm::call_manager::ExecutionType;
 // test target
 use fvm::kernel::default::DefaultKernel;
 use fvm::kernel::{Block, BlockRegistry};
-use fvm::Kernel;
+use fvm::BaseKernel;
 use multihash::Code;
 use num_traits::Zero;
 
@@ -28,7 +28,6 @@ pub fn build_inspecting_test() -> anyhow::Result<(TestingKernel, Rc<RefCell<Test
         0,
         0,
         Zero::zero(),
-        ExecutionType::Normal,
     );
     Ok((kern, test_data))
 }
@@ -48,7 +47,6 @@ pub fn build_inspecting_gas_test(
         0,
         0,
         Zero::zero(),
-        ExecutionType::Normal,
     );
     Ok((kern, test_data))
 }

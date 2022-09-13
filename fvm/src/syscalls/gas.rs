@@ -3,10 +3,10 @@ use std::str;
 use super::Context;
 use crate::gas::Gas;
 use crate::kernel::{ClassifyResult, Result};
-use crate::Kernel;
+use crate::BaseKernel;
 
 pub fn charge_gas(
-    context: Context<'_, impl Kernel>,
+    context: Context<'_, impl BaseKernel>,
     name_off: u32,
     name_len: u32,
     compute: i64,

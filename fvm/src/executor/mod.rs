@@ -17,7 +17,7 @@ pub use threaded::ThreadedExecutor;
 
 use crate::call_manager::Backtrace;
 use crate::trace::ExecutionTrace;
-use crate::Kernel;
+use crate::{BaseKernel, CheckedKernel};
 
 /// TODO
 #[derive(Debug, Serialize, Deserialize)]
@@ -45,7 +45,7 @@ pub trait Executor {
     /// The [`Kernel`] on which messages will be applied. We specify a [`Kernel`] here, not a
     /// [`Machine`](crate::machine::Machine), because the [`Kernel`] implies the
     /// [`Machine`](crate::machine::Machine).
-    type Kernel: Kernel;
+    type Kernel: BaseKernel;
 
     /// This is the entrypoint to execute a message.
     ///
@@ -63,8 +63,8 @@ pub trait Executor {
 }
 
 pub trait ValidateExecutor: Executor {
-    type Validator: Kernel;
-    
+    type Validator: CheckedKernel;
+
     /// This is the entrypoint to validate a message from an abstract account.
     fn validate_message(&mut self, msg: Message, sig: Vec<u8>) -> anyhow::Result<GasSpec>;
 }

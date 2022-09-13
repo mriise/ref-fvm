@@ -284,12 +284,31 @@ where
     fn invocation_count(&self) -> u64 {
         self.0.invocation_count()
     }
+
+    fn validate<K: CheckedKernel<CallManager = Self>>(
+        &mut self,
+        params: fvm::kernel::Block, // Message
+        from: ActorID,
+    ) -> Result<InvocationResult> {
+        todo!()
+    }
+
+    fn send_abstract<K: CheckedKernel<CallManager = Self>>(
+        &mut self,
+        from: ActorID,
+        to: Address,
+        method: MethodNum,
+        params: Option<fvm::kernel::Block>,
+        value: &TokenAmount,
+    ) -> Result<InvocationResult> {
+        todo!()
+    }
 }
 
 /// A kernel for intercepting syscalls.
 pub struct TestKernel<K = DefaultKernel<TestCallManager>>(pub K, pub TestData);
 
-impl<M, C, K> Kernel for TestKernel<K>
+impl<M, C, K> BaseKernel for TestKernel<K>
 where
     M: Machine,
     C: CallManager<Machine = TestMachine<M>>,
@@ -332,6 +351,13 @@ where
         )
     }
 }
+
+impl<M, C, K> Kernel for TestKernel<K>
+where
+    M: Machine,
+    C: CallManager<Machine = TestMachine<M>>,
+    K: Kernel<CallManager = TestCallManager<C>>,
+{}
 
 impl<M, C, K> ActorOps for TestKernel<K>
 where
@@ -499,7 +525,7 @@ impl<M, C, K> DebugOps for TestKernel<K>
 where
     M: Machine,
     C: CallManager<Machine = TestMachine<M>>,
-    K: Kernel<CallManager = TestCallManager<C>>,
+    K: BaseKernel<CallManager = TestCallManager<C>>,
 {
     fn log(&self, msg: String) {
         self.0.log(msg)
@@ -518,7 +544,7 @@ impl<M, C, K> GasOps for TestKernel<K>
 where
     M: Machine,
     C: CallManager<Machine = TestMachine<M>>,
-    K: Kernel<CallManager = TestCallManager<C>>,
+    K: BaseKernel<CallManager = TestCallManager<C>>,
 {
     fn gas_used(&self) -> Gas {
         self.0.gas_used()

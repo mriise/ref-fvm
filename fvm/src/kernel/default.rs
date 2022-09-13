@@ -27,7 +27,7 @@ use super::blocks::{Block, BlockRegistry};
 use super::error::Result;
 use super::hash::SupportedHashes;
 use super::*;
-use crate::call_manager::{CallManager, InvocationResult, NO_DATA_BLOCK_ID, ExecutionType};
+use crate::call_manager::{CallManager, ExecutionType, InvocationResult, NO_DATA_BLOCK_ID};
 use crate::externs::{Consensus, Rand};
 use crate::gas::GasCharge;
 use crate::state_tree::ActorState;
@@ -64,9 +64,11 @@ pub struct DefaultKernel<C> {
     execution_type: ExecutionType,
 }
 
+impl<C: CallManager> Kernel for DefaultKernel<C> {}
+
 // Even though all children traits are implemented, Rust needs to know that the
 // supertrait is implemented too.
-impl<C> Kernel for DefaultKernel<C>
+impl<C> BaseKernel for DefaultKernel<C>
 where
     C: CallManager,
 {
@@ -86,7 +88,6 @@ where
         actor_id: ActorID,
         method: MethodNum,
         value_received: TokenAmount,
-        execution_type: ExecutionType,
     ) -> Self {
         DefaultKernel {
             call_manager: mgr,
@@ -95,10 +96,36 @@ where
             actor_id,
             method,
             value_received,
-            execution_type,
+            execution_type: ExecutionType::Normal,
         }
     }
 }
+
+
+impl<C> CheckedKernel for DefaultKernel<C>
+where
+    C: CallManager,
+{
+    fn new_validate(
+        mgr: C,
+        blocks: BlockRegistry,
+        from: ActorID,
+    ) -> Self
+    where
+        Self: Sized {
+        DefaultKernel {
+            call_manager: mgr,
+            blocks,
+            caller: from,
+            actor_id: from,
+            method: 0xff, // TODO
+            value_received: Zero::zero(),
+            execution_type: ExecutionType::Validator,
+        }
+    }
+}
+
+impl<C: CallManager> ValidateKernel for DefaultKernel<C> {}
 
 impl<C> DefaultKernel<C>
 where
@@ -246,14 +273,6 @@ where
     }
 }
 
-impl<C> Validator for DefaultKernel<C>
-where
-    C: CallManager,
-{
-    fn is_validator(&self) -> bool {
-        self.execution_type == ExecutionType::Validator
-    }
-}
 impl<C> IpldBlockOps for DefaultKernel<C>
 where
     C: CallManager,

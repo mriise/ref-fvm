@@ -1,11 +1,12 @@
 use std::mem;
 
 use anyhow::{anyhow, Context as _};
-use wasmtime::{AsContextMut, Global, Linker, Memory, Val};
+use wasmtime::{AsContextMut, Global, Linker, Memory, Val, Func, Caller};
 
 use crate::call_manager::backtrace;
 use crate::gas::Gas;
-use crate::Kernel;
+use crate::{Kernel, CheckedKernel};
+use crate::kernel::{BaseKernel, ValidateKernel, DebugOps, SendOps, IpldBlockOps};
 
 pub(crate) mod error;
 
@@ -21,6 +22,8 @@ mod rand;
 mod send;
 mod sself;
 mod vm;
+
+use crate::syscalls::ipld::IpldFunctions;
 
 pub(self) use context::Context;
 
@@ -46,7 +49,7 @@ pub struct InvocationData<K> {
 }
 
 pub fn update_gas_available(
-    ctx: &mut impl AsContextMut<Data = InvocationData<impl Kernel>>,
+    ctx: &mut impl AsContextMut<Data = InvocationData<impl BaseKernel>>,
 ) -> Result<(), Abort> {
     let mut ctx = ctx.as_context_mut();
     let avail_milligas = ctx.data_mut().kernel.gas_available().as_milligas();
@@ -62,7 +65,7 @@ pub fn update_gas_available(
 
 /// Updates the FVM-side gas tracker with newly accrued execution gas charges.
 pub fn charge_for_exec(
-    ctx: &mut impl AsContextMut<Data = InvocationData<impl Kernel>>,
+    ctx: &mut impl AsContextMut<Data = InvocationData<impl BaseKernel>>,
 ) -> Result<(), Abort> {
     let mut ctx = ctx.as_context_mut();
     let global = ctx.data_mut().avail_gas_global;
@@ -89,16 +92,21 @@ pub fn charge_for_exec(
     Ok(())
 }
 
-use self::bind::BindSyscall;
+use self::bind::{BindSyscall, BindCheckedSyscall};
 use self::error::Abort;
+
+
 
 // Binds the syscall handlers so they can handle invocations
 // from the actor code.
-pub fn bind_syscalls(
-    linker: &mut Linker<InvocationData<impl Kernel + 'static>>,
+pub fn bind_invoke_syscalls<K: Kernel>(
+    linker: &mut Linker<InvocationData<K>>,
 ) -> anyhow::Result<()> {
-    linker.bind("vm", "abort", vm::abort)?;
-    linker.bind("vm", "context", vm::context)?;
+    <K as Bind<K, debug::Debug>>::bind_syscalls(linker)?;
+    <K as Bind<K, send::Send>>::bind_syscalls(linker)?;
+    <K as Bind<K, vm::VmAbort>>::bind_syscalls(linker)?;
+    <K as Bind<K, vm::InvokeContext>>::bind_syscalls(linker)?;    
+
 
     linker.bind("network", "base_fee", network::base_fee)?;
     linker.bind(
@@ -113,10 +121,7 @@ pub fn bind_syscalls(
     linker.bind("ipld", "block_stat", ipld::block_stat)?;
     linker.bind("ipld", "block_link", ipld::block_link)?;
 
-    linker.bind("self", "root", sself::root)?;
-    linker.bind("self", "set_root", sself::set_root)?;
-    linker.bind("self", "current_balance", sself::current_balance)?;
-    linker.bind("self", "self_destruct", sself::self_destruct)?;
+    <K as Bind<K, sself::Sself>>::bind_syscalls(linker)?;
 
     linker.bind("actor", "resolve_address", actor::resolve_address)?;
     linker.bind("actor", "get_actor_code_cid", actor::get_actor_code_cid)?;
@@ -168,17 +173,21 @@ pub fn bind_syscalls(
     )?;
     linker.bind("crypto", "batch_verify_seals", crypto::batch_verify_seals)?;
 
-    linker.bind("rand", "get_chain_randomness", rand::get_chain_randomness)?;
-    linker.bind("rand", "get_beacon_randomness", rand::get_beacon_randomness)?;
 
     linker.bind("gas", "charge", gas::charge_gas)?;
 
-    // Ok, this singled-out syscall should probably be in another category.
-    linker.bind("send", "send", send::send)?;
-
-    linker.bind("debug", "log", debug::log)?;
-    linker.bind("debug", "enabled", debug::enabled)?;
-    linker.bind("debug", "store_artifact", debug::store_artifact)?;
-
     Ok(())
 }
+
+pub(crate) trait Bind<K, BT> {
+    fn bind_syscalls(linker: &mut Linker<InvocationData<K>>) -> anyhow::Result<()>;
+}
+
+
+
+pub fn bind_validate_syscalls<K: ValidateKernel>(
+    linker: &mut Linker<InvocationData<K>>,
+) -> anyhow::Result<()> {
+    todo!()
+}
+

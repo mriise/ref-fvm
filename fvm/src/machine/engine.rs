@@ -12,10 +12,12 @@ use fvm_wasm_instrument::parity_wasm::elements;
 use wasmtime::OptLevel::Speed;
 use wasmtime::{Global, GlobalType, Linker, Memory, MemoryType, Module, Mutability, Val, ValType};
 
+use crate::call_manager::ExecutionType;
 use crate::gas::WasmGasPrices;
+use crate::kernel::{BaseKernel, ValidateKernel};
 use crate::machine::NetworkConfig;
-use crate::syscalls::{bind_syscalls, InvocationData};
-use crate::Kernel;
+use crate::syscalls::{bind_invoke_syscalls, InvocationData, bind_validate_syscalls};
+use crate::{Kernel, CheckedKernel};
 
 /// A caching wasmtime engine.
 #[derive(Clone)]
@@ -351,7 +353,7 @@ impl Engine {
     }
 
     /// Lookup and instantiate a loaded wasmtime module with the given store. This will cache the
-    /// linker, syscalls, "pre" isntance, etc.
+    /// linker, syscalls, "pre" instance, etc.
     pub fn get_instance<K: Kernel>(
         &self,
         store: &mut wasmtime::Store<InvocationData<K>>,
@@ -371,7 +373,48 @@ impl Engine {
                     let mut linker: Linker<InvocationData<K>> = Linker::new(&self.0.engine);
                     linker.allow_shadowing(true);
 
-                    bind_syscalls(&mut linker)?;
+                    bind_invoke_syscalls(&mut linker)?;
+                    Box::new(Cache { linker })
+                })
+                .downcast_mut()
+                .expect("invalid instance cache entry"),
+        };
+        cache
+            .linker
+            .define("gas", GAS_COUNTER_NAME, store.data_mut().avail_gas_global)?;
+
+        let module_cache = self.0.module_cache.lock().expect("module_cache poisoned");
+        let module = match module_cache.get(k) {
+            Some(module) => module,
+            None => return Ok(None),
+        };
+        let instance = cache.linker.instantiate(&mut *store, module)?;
+
+        Ok(Some(instance))
+    }
+
+    /// TODO
+    /// abstract accounts have runtime values that are checked per-syscall for both validate and invoke
+    pub fn get_checked_instance<K: ValidateKernel>(
+        &self,
+        store: &mut wasmtime::Store<InvocationData<K>>,
+        k: &Cid,
+    ) -> anyhow::Result<Option<wasmtime::Instance>> {
+        let k = self.with_redirect(k);
+        let mut instance_cache = self.0.instance_cache.lock().expect("cache poisoned");
+
+        let type_id = TypeId::of::<K>();
+        let cache: &mut Cache<K> = match instance_cache.entry(type_id) {
+            Occupied(e) => &mut *e
+                .into_mut()
+                .downcast_mut()
+                .expect("invalid instance cache entry"),
+            Vacant(e) => &mut *e
+                .insert({
+                    let mut linker: Linker<InvocationData<K>> = Linker::new(&self.0.engine);
+                    linker.allow_shadowing(true);
+
+                    bind_validate_syscalls(&mut linker)?; // TODO
                     Box::new(Cache { linker })
                 })
                 .downcast_mut()
@@ -392,7 +435,7 @@ impl Engine {
     }
 
     /// Construct a new wasmtime "store" from the given kernel.
-    pub fn new_store<K: Kernel>(&self, kernel: K) -> wasmtime::Store<InvocationData<K>> {
+    pub fn new_store<K: BaseKernel>(&self, kernel: K) -> wasmtime::Store<InvocationData<K>> {
         let id = InvocationData {
             kernel,
             last_error: None,

@@ -36,28 +36,7 @@ pub enum SendResult {
     Abort(ExitCode),
 }
 
-/// The "kernel" implements the FVM interface as presented to the actors. It:
-///
-/// - Manages the Actor's state.
-/// - Tracks and charges for IPLD & syscall-specific gas.
-///
-/// Actors may call into the kernel via the syscalls defined in the [`syscalls`][crate::syscalls]
-/// module.
-pub trait Kernel:
-    ActorOps
-    + IpldBlockOps
-    + CircSupplyOps
-    + CryptoOps
-    + DebugOps
-    + GasOps
-    + MessageOps
-    + NetworkOps
-    + RandomnessOps
-    + SelfOps
-    + SendOps
-    + Validator
-    + 'static
-{
+pub trait BaseKernel: DebugOps + GasOps + CryptoOps + 'static {
     /// The [`Kernel`]'s [`CallManager`] is
     type CallManager: CallManager;
 
@@ -80,16 +59,43 @@ pub trait Kernel:
         actor_id: ActorID,
         method: MethodNum,
         value_received: TokenAmount,
-        execution_type: ExecutionType,
     ) -> Self
     where
-        Self: Sized;    
+        Self: Sized;
 }
 
-/// TODO
-pub trait Validator {
-    fn is_validator(&self) -> bool;
+/// The "kernel" implements the FVM interface as presented to the actors. It:
+///
+/// - Manages the Actor's state.
+/// - Tracks and charges for IPLD & syscall-specific gas.
+///
+/// Actors may call into the kernel via the syscalls defined in the [`syscalls`][crate::syscalls]
+/// module.
+pub trait Kernel:
+    BaseKernel
+    + ActorOps
+    + IpldBlockOps
+    + CircSupplyOps
+    + GasOps
+    + MessageOps
+    + NetworkOps
+    + RandomnessOps
+    + SelfOps
+    + SendOps
+{
 }
+
+pub trait CheckedKernel: BaseKernel + IpldBlockOps + GasOps + MessageOps {
+    fn new_validate(
+        mgr: <Self as BaseKernel>::CallManager,
+        blocks: BlockRegistry,
+        from: ActorID,
+    ) -> Self
+    where
+        Self: Sized;
+}
+
+pub trait ValidateKernel: BaseKernel + GasOps {}
 
 /// Network-related operations.
 pub trait NetworkOps {

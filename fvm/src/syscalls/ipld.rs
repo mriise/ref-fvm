@@ -1,8 +1,9 @@
 use fvm_shared::sys;
+use wasmtime::Linker;
 
 use super::Context;
-use crate::kernel::Result;
-use crate::Kernel;
+use crate::kernel::{Result, IpldBlockOps};
+use crate::{Kernel};
 
 pub fn block_open(context: Context<'_, impl Kernel>, cid: u32) -> Result<sys::out::ipld::IpldOpen> {
     let cid = context.memory.read_cid(cid)?;
@@ -62,3 +63,11 @@ pub fn block_stat(context: Context<'_, impl Kernel>, id: u32) -> Result<sys::out
             size: stat.size,
         })
 }
+
+pub trait IpldFunctions {
+    fn bind_ipld<T>(linker: &mut Linker<T>) {
+        todo!()
+    }
+}
+
+impl<T: IpldBlockOps> IpldFunctions for T {} 

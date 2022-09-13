@@ -5,10 +5,10 @@ use fvm_shared::message::Message;
 use fvm_shared::{ActorID, MethodNum};
 
 use crate::gas::{GasCharge, GasTracker, PriceList};
-use crate::kernel::{self, Result};
+use crate::kernel::{self, Result, ValidateKernel};
 use crate::machine::{Machine, MachineContext};
 use crate::state_tree::StateTree;
-use crate::Kernel;
+use crate::{Kernel, CheckedKernel};
 
 pub mod backtrace;
 
@@ -56,8 +56,19 @@ pub trait CallManager: 'static {
         value: &TokenAmount,
     ) -> Result<InvocationResult>;
 
+    /// TODO 
+    /// sends to an abstract account, so runtime checks must be added
+    fn send_abstract<K: CheckedKernel<CallManager = Self>>(
+        &mut self,
+        from: ActorID,
+        to: Address,
+        method: MethodNum,
+        params: Option<kernel::Block>,
+        value: &TokenAmount,
+    ) -> Result<InvocationResult>;
+
     /// TODO
-    fn validate<K: Kernel<CallManager = Self>>(
+    fn validate<K: ValidateKernel<CallManager = Self>>(
         &mut self,
         params: kernel::Block, // Message
         from: ActorID,
@@ -140,7 +151,9 @@ pub enum InvocationResult {
     Failure(ExitCode),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// TODO
+/// used for the runtime check of abstract accounts
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ExecutionType {
     Normal,
     Validator,
