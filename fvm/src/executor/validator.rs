@@ -6,7 +6,7 @@ use fvm_shared::message::Message;
 use super::{ApplyKind, ApplyRet, DefaultExecutor, Executor, ValidateExecutor};
 use crate::call_manager::{CallManager, InvocationResult};
 use crate::executor::{ApplyFailure, GasSpec, ValidateParams};
-use crate::kernel::{Block, Context, ExecutionError};
+use crate::kernel::{Block, Context, ExecutionError, ValidateKernel};
 use crate::machine::Machine;
 use crate::{Kernel, CheckedKernel};
 
@@ -36,7 +36,7 @@ where
 
 impl<K> ValidateExecutor for DefaultValidateExecutor<K>
 where
-    K: CheckedKernel + Kernel,
+    K: ValidateKernel + CheckedKernel + Kernel,
 {
     type Validator = K;
 

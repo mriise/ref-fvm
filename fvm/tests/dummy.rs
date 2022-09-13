@@ -6,6 +6,7 @@ use anyhow::Context;
 use fvm::call_manager::{Backtrace, CallManager, FinishRet, InvocationResult};
 use fvm::externs::{Consensus, Externs, Rand};
 use fvm::gas::{Gas, GasCharge, GasTracker};
+use fvm::kernel::ValidateKernel;
 use fvm::machine::{Engine, Machine, MachineContext, Manifest, NetworkConfig};
 use fvm::state_tree::{ActorState, StateTree};
 use fvm::{kernel, Kernel, CheckedKernel};
@@ -245,7 +246,7 @@ impl CallManager for DummyCallManager {
         todo!()
     }
 
-    fn validate<K: CheckedKernel<CallManager = Self>>(
+    fn validate<K: ValidateKernel<CallManager = Self>>(
         &mut self,
         _params: kernel::Block, // Message
         _from: ActorID,

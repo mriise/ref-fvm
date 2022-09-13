@@ -5,7 +5,7 @@ use fvm_shared::message::Message;
 use fvm_shared::{ActorID, MethodNum};
 
 use crate::gas::{GasCharge, GasTracker, PriceList};
-use crate::kernel::{self, Result};
+use crate::kernel::{self, Result, ValidateKernel};
 use crate::machine::{Machine, MachineContext};
 use crate::state_tree::StateTree;
 use crate::{Kernel, CheckedKernel};
@@ -68,7 +68,7 @@ pub trait CallManager: 'static {
     ) -> Result<InvocationResult>;
 
     /// TODO
-    fn validate<K: CheckedKernel<CallManager = Self>>(
+    fn validate<K: ValidateKernel<CallManager = Self>>(
         &mut self,
         params: kernel::Block, // Message
         from: ActorID,

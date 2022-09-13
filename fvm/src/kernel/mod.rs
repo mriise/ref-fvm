@@ -85,7 +85,7 @@ pub trait Kernel:
 {
 }
 
-pub trait CheckedKernel: BaseKernel {
+pub trait CheckedKernel: BaseKernel + IpldBlockOps + GasOps + MessageOps {
     fn new_validate(
         mgr: <Self as BaseKernel>::CallManager,
         blocks: BlockRegistry,
@@ -93,9 +93,9 @@ pub trait CheckedKernel: BaseKernel {
     ) -> Self
     where
         Self: Sized;
-    
-    fn execution_type(&self) -> ExecutionType;
 }
+
+pub trait ValidateKernel: BaseKernel + GasOps {}
 
 /// Network-related operations.
 pub trait NetworkOps {

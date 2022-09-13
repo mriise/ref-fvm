@@ -12,7 +12,7 @@ use super::{Backtrace, CallManager, ExecutionType, InvocationResult, NO_DATA_BLO
 use crate::call_manager::backtrace::Frame;
 use crate::call_manager::FinishRet;
 use crate::gas::{Gas, GasTracker};
-use crate::kernel::{Block, BlockRegistry, ExecutionError, Kernel, Result, SyscallError, CheckedKernel};
+use crate::kernel::{Block, BlockRegistry, ExecutionError, Kernel, Result, SyscallError, CheckedKernel, ValidateKernel};
 use crate::machine::Machine;
 use crate::syscalls::error::Abort;
 use crate::syscalls::{charge_for_exec, update_gas_available};
@@ -184,7 +184,7 @@ where
         todo!()
     }
 
-    fn validate<K: CheckedKernel<CallManager = Self>>(
+    fn validate<K: ValidateKernel<CallManager = Self>>(
         &mut self,
         params: crate::kernel::Block, // Message
         from: ActorID,
@@ -569,7 +569,7 @@ where
 
     fn validate_unchecked<K>(&mut self, from: ActorID, params: Block) -> Result<InvocationResult>
     where
-        K: CheckedKernel<CallManager = Self>,
+        K: ValidateKernel<CallManager = Self>,
     {
         // Lookup the actor.
         let state = self

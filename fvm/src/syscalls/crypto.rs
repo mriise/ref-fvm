@@ -13,8 +13,8 @@ use fvm_shared::sys;
 use num_traits::FromPrimitive;
 
 use super::Context;
-use crate::kernel::{ClassifyResult, Result};
-use crate::{syscall_error, BaseKernel};
+use crate::kernel::{ClassifyResult, Result, CryptoOps};
+use crate::syscall_error;
 
 /// Verifies that a signature is valid for an address and plaintext.
 ///
@@ -23,7 +23,7 @@ use crate::{syscall_error, BaseKernel};
 ///  - -1: verification failed.
 #[allow(clippy::too_many_arguments)]
 pub fn verify_signature(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     sig_type: u32,
     sig_off: u32,
     sig_len: u32,
@@ -46,7 +46,7 @@ pub fn verify_signature(
 }
 
 pub fn recover_secp_public_key(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     hash_off: u32,
     sig_off: u32,
 ) -> Result<[u8; SECP_PUB_LEN]> {
@@ -70,7 +70,7 @@ pub fn recover_secp_public_key(
 /// Hashes input data using the specified hash function, writing the digest into the provided
 /// buffer.
 pub fn hash(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     hash_code: u64,
     data_off: u32, // input
     data_len: u32,
@@ -98,7 +98,7 @@ pub fn hash(
 ///
 /// Writes the CID in the provided output buffer.
 pub fn compute_unsealed_sector_cid(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     proof_type: i64, // RegisteredSealProof,
     pieces_off: u32, // [PieceInfo]
     pieces_len: u32,
@@ -128,7 +128,7 @@ pub fn compute_unsealed_sector_cid(
 ///  - 0: verification ok.
 ///  - -1: verification failed.
 pub fn verify_seal(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     info_off: u32, // SealVerifyInfo
     info_len: u32,
 ) -> Result<i32> {
@@ -147,7 +147,7 @@ pub fn verify_seal(
 ///  - 0: verification ok.
 ///  - -1: verification failed.
 pub fn verify_post(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     info_off: u32, // WindowPoStVerifyInfo,
     info_len: u32,
 ) -> Result<i32> {
@@ -171,7 +171,7 @@ pub fn verify_post(
 /// blocks in the parent of h2 (i.e. h2's grandparent).
 ///
 pub fn verify_consensus_fault(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     h1_off: u32,
     h1_len: u32,
     h2_off: u32,
@@ -209,7 +209,7 @@ pub fn verify_consensus_fault(
 ///  - 0: verification ok.
 ///  - -1: verification failed.
 pub fn verify_aggregate_seals(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     agg_off: u32, // AggregateSealVerifyProofAndInfos
     agg_len: u32,
 ) -> Result<i32> {
@@ -226,7 +226,7 @@ pub fn verify_aggregate_seals(
 ///  - 0: verification ok.
 ///  - -1: verification failed.
 pub fn verify_replica_update(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     rep_off: u32, // ReplicaUpdateInfo
     rep_len: u32,
 ) -> Result<i32> {
@@ -244,7 +244,7 @@ pub fn verify_replica_update(
 /// When successful, this method will write a single byte back into the array at `result_off` for
 /// each result: 0 for failed, 1 for success.
 pub fn batch_verify_seals(
-    context: Context<'_, impl BaseKernel>,
+    context: Context<'_, impl CryptoOps>,
     batch_off: u32,
     batch_len: u32,
     result_off: u32,

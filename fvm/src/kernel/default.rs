@@ -123,11 +123,9 @@ where
             execution_type: ExecutionType::Validator,
         }
     }
-
-    fn execution_type(&self) -> ExecutionType {
-        self.execution_type
-    }
 }
+
+impl<C: CallManager> ValidateKernel for DefaultKernel<C> {}
 
 impl<C> DefaultKernel<C>
 where

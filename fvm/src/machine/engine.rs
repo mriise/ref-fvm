@@ -14,9 +14,9 @@ use wasmtime::{Global, GlobalType, Linker, Memory, MemoryType, Module, Mutabilit
 
 use crate::call_manager::ExecutionType;
 use crate::gas::WasmGasPrices;
-use crate::kernel::BaseKernel;
+use crate::kernel::{BaseKernel, ValidateKernel};
 use crate::machine::NetworkConfig;
-use crate::syscalls::{bind_syscalls, InvocationData, bind_validate_syscalls};
+use crate::syscalls::{bind_invoke_syscalls, InvocationData, bind_validate_syscalls};
 use crate::{Kernel, CheckedKernel};
 
 /// A caching wasmtime engine.
@@ -373,7 +373,7 @@ impl Engine {
                     let mut linker: Linker<InvocationData<K>> = Linker::new(&self.0.engine);
                     linker.allow_shadowing(true);
 
-                    bind_syscalls(&mut linker)?;
+                    bind_invoke_syscalls(&mut linker)?;
                     Box::new(Cache { linker })
                 })
                 .downcast_mut()
@@ -395,7 +395,7 @@ impl Engine {
 
     /// TODO
     /// abstract accounts have runtime values that are checked per-syscall for both validate and invoke
-    pub fn get_checked_instance<K: CheckedKernel>(
+    pub fn get_checked_instance<K: ValidateKernel>(
         &self,
         store: &mut wasmtime::Store<InvocationData<K>>,
         k: &Cid,
